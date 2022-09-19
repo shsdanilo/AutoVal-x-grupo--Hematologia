@@ -1,0 +1,201 @@
+
+Logical notAutoVal,AllInSample;
+integer i,Mode,nGroup,NormSevLim,DeltaSevLim,QCSevLim,InstSevLim;
+String Group;
+Request rq;
+
+/*----------------------------------------------------------------------------*/
+
+
+
+/*----------------------------------------------------------------------------*/
+
+
+/* ---------------CONFIGURACION DE VALIDACION POR GRUPO ------------- */
+/*limite de la autovalidacion (cualquier resultado con sev mayor o igual se retiene todo el hemograma)*/
+
+/* Configurar el listado de examenes separados por ,(coma), verificar que concida con "Codigo de Prueba*/
+
+Group:="WBC,RBC,HGB,HCT,MCV,MCH,MCHC,RDW,PLT,MPV,NEUTp,LYMp,MONOp,EOSp,BASOp,LUCp,NEUTc,LYMc,MONOc,EOSc,BASOc,LUCc,PDW,PCT,HDW,WBCP,WBCB,NEUTy,LI,MPXI";
+
+
+/* Mode=
+1 -> Solo se aplica el proceso cuando todos los examenes del grupo esten en la muestra, si no estan todos los examenes, cada uno se autovalida independientemente
+2 -> Solo se aplica el proceso cuando todos los examenes del grupo esten en la muestra, si no estan todos los examenes, no se autovalida ninguno
+3 -> Se aplica el proceso a cualquier combinacion de examenes en el grupo que llegue en la muestra*/
+   
+Mode:=3;
+
+
+
+/*-----------------------AUTOVALIDACION POR GRUPO------------------------*/
+
+Message("Ejecutando MISPL: AdvAV - AutoVal x grupo - Trigger - Hemograma ->"+Group);
+IF Mode<1 OR Mode>3 THEN
+	Message("Error: Parametro mode no valido!!!");
+	RETURN FALSE;
+ENDIF;
+
+
+i:=1;
+nGroup:=numEntries(Group,?);
+notAutoVal:=FALSE;
+AllInSample:=TRUE;
+
+IF nGroup<=1 THEN
+	Message("Error: Un grupo debe estar compuesto de por lo menos 2 examenes");
+	RETURN FALSE;
+ENDIF;
+
+IF nGroup=2 AND Mode=3 THEN
+    Message("Modo 3 con grupo de 2 examenes, se asumira como Modo=1");
+	Mode:=1; /* si es un grupo de 2 examenes, es lo mismo que una validacion independiente por examen en caso de q no este alguno por lo que se comporta como un modo 1, mas facil la condicional que dejar a servicio la configuracion*/
+ENDIF;
+
+/*Revisar si todos los examenes estan en la muestra*/
+While i<=nGroup DO
+    rq:=.Sample.getRequest(Entry(i,Group,?));
+	
+	
+	
+	IF rq=? OR rq.status=RequestStatus["Omitted"] THEN
+		AllInSample:=FALSE;
+		/*Debug*/ Message("Not all in Sample!!");
+		
+		IF FindTestByName(Entry(i,Group,?))=? THEN
+			Message("Advertencia: Test "+Entry(i,Group,?)+" configurado en el grupo no existe revise configuracion del grupo en el MISPL");
+		ENDIF;
+		
+		IF Mode=2 THEN
+			Message("Mode=2: Todos los examenes no estan en la muestra, no se autovalida ninguno!!");
+			RETURN FALSE;
+		ENDIF; 
+		
+	ENDIF;
+    
+	i:=i+1;
+DONE;
+
+/*Debug*/ Message("Check if all test in sample, done!");
+
+i:=1;
+/* Revisar que todos lo examenes tengan un resultado y metodo asociado*/
+While i<=nGroup DO
+	rq:=.Sample.getRequest(Entry(i,Group,?));    
+	
+	IF rq<>? THEN	
+		IF AllInSample=FALSE AND Mode=1 THEN
+			/*Debug*/ Message("Mode=1: "+rq.test.name+" autoval to default");
+			rq.SetAutovalidationMode(2); 
+			
+		ELSE
+			
+			IF rq.status<RequestStatus["Review"]  THEN
+				Message("Resultado de "+rq.test.name+" pendiente");
+				RETURN FALSE; /* Interrumpe la ejecucion en el momento que encuentra que cualquiera de los examenes no tiene resultado*/
+			ENDIF;
+
+			IF rq.Test.Calculation=? AND rq.Result.Method=? THEN
+				Message("Resultado de "+rq.test.name+" no es calculo o no tiene Metodo asociado, autovalidacion del grupo no es posible!");
+				RETURN FALSE; /* Interrumpe la ejecucion en el momento que encuentra que cualquiera de los examenes no es calculo y no tiene metodo asociado*/
+			ENDIF;		
+		
+		ENDIF;
+	ENDIF;
+	i:=i+1;
+DONE;
+
+IF AllInSample=FALSE AND Mode=1 THEN
+	Message("Mode=1: No estan todos los examenes del grupo en la muestra, se autovalidan independiente");
+	RETURN FALSE;
+ENDIF;
+
+/*Debug*/ Message("Check if status and method are correct, done!");
+
+/*Evaluar los limites de autovalidacion de todos los examenes*/
+i:=1;
+
+While i<=nGroup DO
+	rq:=.Sample.getRequest(Entry(i,Group,?));
+	
+	IF rq<>? THEN
+		IF rq.Test.Calculation=? THEN
+			NormSevLim:=rq.Result.Method.NormSeverityLimit; 
+			DeltaSevLim:=rq.Result.Method.DeltaNormSeverityLimit;
+			QCSevLim:=rq.Result.Method.InstSeverityLimit;
+			InstSevLim:=rq.Result.Method.QCSeverityLimit;
+			/*Debug*/ Message(rq.test.name+" limites de severidad de Metodo!");			
+			
+		ELSE
+			NormSevLim:=rq.Test.CalcNormSevLimit; 
+			DeltaSevLim:=rq.Test.CalcDeltaNormSevLimit;
+			QCSevLim:=rq.Test.CalcQCSevLimit;
+			InstSevLim:=rq.Test.CalcInstSevLimit;
+			/*Debug*/ Message(rq.test.name+" calculado, limites de severidad de calculo!");
+			
+		ENDIF;
+
+         /*Debug*/ Message(rq.test.name+" Limites-> N:"+ifKnownString(toString(NormSevLim,"%d"))+" D:"+ifKnownString(toString(DeltaSevLim,"%d"))+" Q:"+ifKnownString(toString(QCSevLim,"%d"))+" I:"+ifKnownString(toString(InstSevLim,"%d")));
+		 
+		 
+		/* Interrumpir proceso si alguno de los limites de autovalidacion no esta configurado*/
+		IF NormSevLim=? OR DeltaSevLim=? OR QCSevLim=? OR InstSevLim=? THEN
+			Message("Limites de severidad de "+rq.test.name+" no configurados, autovalidacion del grupo no es posible!");
+			RETURN FALSE;
+		ENDIF;
+
+		/*Evaluar si todos los request estan por debajo de los limites de severidad*/
+		
+		IF abs(rq.NormSeverity)>=NormSevLim OR abs(rq.DeltaNormSeverity)>=DeltaSevLim OR abs(rq.QCSeverity)>=QCSevLim OR abs(rq.InstrumentSeverity)>=InstSevLim THEN
+			Message(rq.test.name +" no cumple con los criterios de validacion, autoval del grupo detenida...");
+			notAutoVal:=TRUE;
+		ENDIF;	
+	ENDIF;
+	
+	i:=i+1;
+DONE;
+
+/*Evaluar aqui HCT/HGB = 3 mas o menos 10%*/
+
+/*Debug*/ Message("Check if limits are met correct, done!");
+
+i:=1;
+IF notAutoVal=true THEN	
+	
+	/* Esta parte regresa el modo de autovalidacion a "Nunca" de todos los examenes del grupo, se realiza para contemplar los casos donde hay reejecuciones en caso de que sean reejecuciones*/
+	While i<=nGroup DO
+		rq:=.Sample.getRequest(Entry(i,Group,?));
+		If rq.status=RequestStatus["Validated"] THEN
+		   rq.invalidate();
+		   Message(rq.test.name +" invalidada por criterios de autovalidacion de los examenes del grupo");
+		ENDIF;
+
+		rq.SetAutovalidationMode(1);
+		
+		i:=i+1;
+	DONE;
+	Message("Se inactiva nuevamente autovalidacion del grupo por incumplimiento de limite de autovalidacion");
+	RETURN TRUE;
+    
+	/* Todos los examenes cumplen los criterio de autovalidacion, se configura modo de autovalidacion en "Por Defecto" para que aplique la autovalidacion de cada examen si esta activada*/
+ELSE IF notAutoVal=false THEN
+	
+	While i<=nGroup DO	
+		rq:=.Sample.getRequest(Entry(i,Group,?));
+		rq.SetAutovalidationMode(2);
+		
+		IF rq.Test.AllowAutovalidation = FALSE THEN
+			Message("Alerta, examen "+rq.Test.Name+" tiene autovalidacion inactiva (Anlisis>Val Autom), resto del grupo se valida!");
+		ENDIF;
+
+		i:=i+1;
+	DONE;
+    Message("Activada la autovalidacion del grupo-> "+Group+" <- Todos cumplen con los criterios!!" ); 
+	.Sample.CheckResults();
+
+	RETURN TRUE;
+	
+ENDIF;
+ENDIF;
+
+RETURN FALSE;
