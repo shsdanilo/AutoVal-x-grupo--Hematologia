@@ -6,40 +6,6 @@ Request rq;
 
 /*----------------------------------------------------------------------------*/
 
-/*VALIDACION REGLA HCT/HGB - */
-
-fractional resHGB,resHCT,index,varPercent,variation;
-
-
-varPercent:=0.1;
-
-resHGB:=.Sample.numericValue("HGB");
-resHCT:=.Sample.numericValue("HCT");
-
-
-IF resHGB<>? AND resHCT<>? THEN
-
-index:=resHCT/3;
-
-variation:=0.1*index;
-
-Message("HCT: "+ toString(resHCT,"%f")+CHR(10)+
-"HGB: "+ toString(resHGB,"%f")+CHR(10)+
-"index(HCT/3): "+ toString(index,"%f")+CHR(10)+
-"variationAllow(10%): "+ toString(variation,"%f")+CHR(10)+
-"variationReal: "+ toString(Fabs(index-resHGB),"%f"));
-
-IF Fabs(resHGB-index) > variation THEN
-
-
-Message("Variacion regla HCT/HGB mayor a la permitida");
-RETURN TRUE;
-
-ENDIF;
-
-
-ENDIF;
-
 /*----------------------------------------------------------------------------*/
 
 

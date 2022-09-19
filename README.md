@@ -18,16 +18,7 @@ Fecha de modificacion: 20200304
 
 Control de Cambios ->
 Version 1.0: Liberacion de desarrollo
-<<<<<<< HEAD
-=======
-Version 1.1 -> Se modifica para implementar validacion de hemoglobina frente a hematocritos
-				El valor del un tercio del hematocrito debe tener una diferencia menor al 10% respecto a la hemoglobina medida 
-				variacion permitida > variacion real
-                0.1(HCT/3)>ABS((HCT/3)-HGB)
-				ejemplo> 
-				Si HCT = 45
-				entonces HGB =15 +- 10%
->>>>>>> v1.1
+
 Si se encuentra que se viola esta regla, se retiene todo el grupo
 
 */
