@@ -4,43 +4,37 @@ integer i,Mode,nGroup,NormSevLim,DeltaSevLim,QCSevLim,InstSevLim;
 String Group;
 Request rq;
 
-/*----------------------------------------------------------------------------*/
-
 /*VALIDACION REGLA HCT/HGB - */
 
 fractional resHGB,resHCT,index,varPercent,variation;
 
+varPercent:=0.1; /*10%*/
 
-varPercent:=0.1;
-
-resHGB:=.Sample.numericValue("HGB");
-resHCT:=.Sample.numericValue("HCT");
+resHGB:=.numericValue("HGB");
+resHCT:=.numericValue("HCT");
 
 
 IF resHGB<>? AND resHCT<>? THEN
 
-index:=resHCT/3;
+	index:=resHCT/3;
 
-variation:=0.1*index;
+	variation:=0.1*index;
 
-Message("HCT: "+ toString(resHCT,"%f")+CHR(10)+
-"HGB: "+ toString(resHGB,"%f")+CHR(10)+
-"index(HCT/3): "+ toString(index,"%f")+CHR(10)+
-"variationAllow(10%): "+ toString(variation,"%f")+CHR(10)+
-"variationReal: "+ toString(Fabs(index-resHGB),"%f"));
+	Message("HCT: "+ toString(resHCT,"%f")+CHR(10)+
+	"HGB: "+ toString(resHGB,"%f")+CHR(10)+
+	"index(HCT/3): "+ toString(index,"%f")+CHR(10)+
+	"variationAllow(10%): "+ toString(variation,"%f")+CHR(10)+
+	"variationReal: "+ toString(Fabs(index-resHGB),"%f"));
 
-IF Fabs(resHGB-index) > variation THEN
-
-
-Message("Variacion regla HCT/HGB mayor a la permitida");
-RETURN TRUE;
-
+	IF Fabs(resHGB-index) > variation THEN
+		Message("Variacion regla HCT/HGB mayor a la permitida");
+		RETURN TRUE;
+	ENDIF;
 ENDIF;
 
+/*NO MODIFICAR ARRIBA DE ESTA LINEA*/
 
-ENDIF;
 
-/*----------------------------------------------------------------------------*/
 
 
 /* ---------------CONFIGURACION DE VALIDACION POR GRUPO ------------- */
@@ -48,15 +42,21 @@ ENDIF;
 
 /* Configurar el listado de examenes separados por ,(coma), verificar que concida con "Codigo de Prueba*/
 
-Group:="WBC,RBC,HGB,HCT,MCV,MCH,MCHC,RDW,PLT,MPV,NEUTp,LYMp,MONOp,EOSp,BASOp,LUCp,NEUTc,LYMc,MONOc,EOSc,BASOc,LUCc,PDW,PCT,HDW,WBCP,WBCB,NEUTy,LI,MPXI";
+/* Group:="WBC,RBC,HGB,HCT,MCV,MCH,MCHC,RDW,PLT,MPV,NEUTp,LYMp,MONOp,EOSp,BASOp,LUCp,NEUTc,LYMc,MONOc,EOSc,BASOc,CHCM"; */
 
+Group:="ANISO,BASOc,BASOp,BLASTS,CH,CHCM,CHCMg,CHCMr,CHDWg,CHDWr,CHg,CHr,EOSc,EOSp,HCT,HCVAR,HDW,HDWg,HDWr,HemImage,HGB,HYPER,HYPO,IG,LI,LPLT,LS,LUCc,LUCp,LYMc,LYMp,MACRO,MCH,MCHC,MCV,MCVg,MCVr,MICRO,MONOc,MONOp,MPO,MPV,MPXI,NEUTc,NEUTp,NEUTx,NEUTy,NRBC,NRBCc,NRBCp,PCT,PDW,PLT,PLTCLM,RBC,RBCF,RBCG,RDW,RDWg,RDWr,RETICc,RETICp,RTCRBC,sf#EOS,sf#LYM,sf#MN,sf#MON,sf#NEU,sf#PMN,sf%EOS,sf%LYM,sf%MN,sf%MON,sf%NEU,sf%PMN,sfRBC,sfWBC,Slide,WBC,WBCB,WBCP";
+
+Mode:=3;
 
 /* Mode=
 1 -> Solo se aplica el proceso cuando todos los examenes del grupo esten en la muestra, si no estan todos los examenes, cada uno se autovalida independientemente
 2 -> Solo se aplica el proceso cuando todos los examenes del grupo esten en la muestra, si no estan todos los examenes, no se autovalida ninguno
 3 -> Se aplica el proceso a cualquier combinacion de examenes en el grupo que llegue en la muestra*/
-   
-Mode:=3;
+
+
+/*NO MODIFICAR ABAJO DE ESTA LINEA*/
+
+
 
 
 
@@ -86,10 +86,8 @@ ENDIF;
 
 /*Revisar si todos los examenes estan en la muestra*/
 While i<=nGroup DO
-    rq:=.Sample.getRequest(Entry(i,Group,?));
-	
-	
-	
+    rq:=.getRequest(Entry(i,Group,?));
+		
 	IF rq=? OR rq.status=RequestStatus["Omitted"] THEN
 		AllInSample:=FALSE;
 		/*Debug*/ Message("Not all in Sample!!");
@@ -110,15 +108,16 @@ DONE;
 
 /*Debug*/ Message("Check if all test in sample, done!");
 
-i:=1;
+
 /* Revisar que todos lo examenes tengan un resultado y metodo asociado*/
+i:=1;
 While i<=nGroup DO
-	rq:=.Sample.getRequest(Entry(i,Group,?));    
+	rq:=.getRequest(Entry(i,Group,?));
 	
-	IF rq<>? THEN	
+	IF rq<>? THEN
 		IF AllInSample=FALSE AND Mode=1 THEN
 			/*Debug*/ Message("Mode=1: "+rq.test.name+" autoval to default");
-			rq.SetAutovalidationMode(2); 
+			rq.SetAutovalidationMode(2);
 			
 		ELSE
 			
@@ -130,7 +129,7 @@ While i<=nGroup DO
 			IF rq.Test.Calculation=? AND rq.Result.Method=? THEN
 				Message("Resultado de "+rq.test.name+" no es calculo o no tiene Metodo asociado, autovalidacion del grupo no es posible!");
 				RETURN FALSE; /* Interrumpe la ejecucion en el momento que encuentra que cualquiera de los examenes no es calculo y no tiene metodo asociado*/
-			ENDIF;		
+			ENDIF;
 		
 		ENDIF;
 	ENDIF;
@@ -148,7 +147,7 @@ ENDIF;
 i:=1;
 
 While i<=nGroup DO
-	rq:=.Sample.getRequest(Entry(i,Group,?));
+	rq:=.getRequest(Entry(i,Group,?));
 	
 	IF rq<>? THEN
 		IF rq.Test.Calculation=? THEN
@@ -187,16 +186,14 @@ While i<=nGroup DO
 	i:=i+1;
 DONE;
 
-/*Evaluar aqui HCT/HGB = 3 mas o menos 10%*/
-
-/*Debug*/ Message("Check if limits are met correct, done!");
+/*Debug*/ Message("Check if limits are correct, done!");
 
 i:=1;
 IF notAutoVal=true THEN	
 	
-	/* Esta parte regresa el modo de autovalidacion a "Nunca" de todos los examenes del grupo, se realiza para contemplar los casos donde hay reejecuciones en caso de que sean reejecuciones*/
+	/* Esta parte regresa el modo de autovalidacion a "Nunca" de todos los examenes del grupo, se realiza para contemplar los casos donde sean reejecuciones*/
 	While i<=nGroup DO
-		rq:=.Sample.getRequest(Entry(i,Group,?));
+		rq:=.getRequest(Entry(i,Group,?));
 		If rq.status=RequestStatus["Validated"] THEN
 		   rq.invalidate();
 		   Message(rq.test.name +" invalidada por criterios de autovalidacion de los examenes del grupo");
@@ -213,7 +210,7 @@ IF notAutoVal=true THEN
 ELSE IF notAutoVal=false THEN
 	
 	While i<=nGroup DO	
-		rq:=.Sample.getRequest(Entry(i,Group,?));
+		rq:=.getRequest(Entry(i,Group,?));
 		rq.SetAutovalidationMode(2);
 		
 		IF rq.Test.AllowAutovalidation = FALSE THEN
@@ -223,7 +220,7 @@ ELSE IF notAutoVal=false THEN
 		i:=i+1;
 	DONE;
     Message("Activada la autovalidacion del grupo-> "+Group+" <- Todos cumplen con los criterios!!" ); 
-	.Sample.CheckResults();
+	.CheckResults();
 
 	RETURN TRUE;
 	
