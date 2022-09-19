@@ -4,13 +4,6 @@ integer i,Mode,nGroup,NormSevLim,DeltaSevLim,QCSevLim,InstSevLim;
 String Group;
 Request rq;
 
-/*----------------------------------------------------------------------------*/
-
-
-
-/*----------------------------------------------------------------------------*/
-
-
 /* ---------------CONFIGURACION DE VALIDACION POR GRUPO ------------- */
 /*limite de la autovalidacion (cualquier resultado con sev mayor o igual se retiene todo el hemograma)*/
 
